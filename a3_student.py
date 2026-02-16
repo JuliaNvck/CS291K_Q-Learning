@@ -183,14 +183,6 @@ def epsilon_greedy_generate_samples(mc, timelimit, epsilon, featuremap, weights,
         actions = np.where(explore, random_actions, greedy_actions) # (N,) array: if explore[i] is True, take random_actions[i], else take greedy_actions[i]
         next_states, rewards, is_terminals = mc.step(actions) # take a step in the environment with the chosen actions
         steps += 1
-        # If any environment is terminal or if we've reached the time limit, reset those environments
-        if steps >= timelimit:
-            next_states = mc.reset() # full reset of all environments
-            steps = 0 # reset step count after a full reset
-        elif np.any(is_terminals):
-             # Masked reset only for environments that finished
-            # (Unfinished environments automatically stay at next_states)
-            next_states = mc.reset(mask=is_terminals)
         yield (
             states,
             actions,
@@ -198,7 +190,16 @@ def epsilon_greedy_generate_samples(mc, timelimit, epsilon, featuremap, weights,
             is_terminals,
             next_states,
         )
-        states = next_states # update state for the next iteration
+        # If any environment is terminal or if we've reached the time limit, reset those environments
+        if steps >= timelimit:
+            states = mc.reset() # full reset of all environments
+            steps = 0 # reset step count after a full reset
+        elif np.any(is_terminals):
+             # Masked reset only for environments that finished
+            # (Unfinished environments automatically stay at next_states)
+            states = mc.reset(mask=is_terminals)
+        else:
+            states = next_states # update state for the next iteration
         
 
 
