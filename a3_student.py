@@ -103,6 +103,10 @@ def genmodel_generate_samples(mc, seed):
     """Generator that yields uniform random samples from the MDP transition model.
 
     See handout for details on expected behavior.
+    uniform sample over S x A,
+    s ~ Uniform(S), a ~ Uniform(A)
+    Use the entire_state_space option in MountainCar.reset to enable this. Note that each
+    dataset is totally independent, and this sampler does not need any knowledge of the current θ. 
 
     Args:
         mc (MountainCar): MountainCar environment object.
@@ -117,15 +121,18 @@ def genmodel_generate_samples(mc, seed):
             is_terminal (array(N) of bool): Batch of is-terminal flags.
             s_next (array(N, S)): Batch of next states.
     """
-    # TODO: Implement.
-    N = mc.n_envs
+    mc.reseed(seed)
+    N = mc.n_envs # batch size - number of parallel environments
     while True:
+        states = mc.reset(entire_state_space=True) # (N, S) array of random states
+        actions = mc.rng.integers(0, mc.N_ACTIONS, size=N) # (N,) array of random actions
+        next_states, rewards, is_terminals = mc.step(actions) # take a step in the environment with the random actions
         yield (
-            np.zeros((N, 2)),
-            np.zeros(N, dtype=int),
-            np.zeros(N),
-            np.zeros(N, dtype=bool),
-            np.zeros((N, 2)),
+            states,
+            actions,
+            rewards,
+            is_terminals,
+            next_states,
         )
 
 
