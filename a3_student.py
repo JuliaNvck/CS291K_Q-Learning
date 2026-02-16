@@ -173,31 +173,32 @@ def epsilon_greedy_generate_samples(mc, timelimit, epsilon, featuremap, weights,
     """
     mc.reseed(seed)
     N = mc.n_envs
-    s = mc.reset() # initial state for each environment
+    states = mc.reset() # initial state for each environment
     steps = 0 # to keep track of how many actions the agent has taken since the last full reset
     while True:
-        current_Qs = featuremap(s) @ weights # (N, A) array of Q-values for each action in the current states
+        current_Qs = featuremap(states) @ weights # (N, A) array of Q-values for each action in the current states
         greedy_actions = np.argmax(current_Qs, axis=1) # (N,) array of greedy actions for each environment
         random_actions = mc.rng.integers(0, mc.N_ACTIONS, size=N) # (N,) array of random actions for each environment
         explore = mc.rng.random(size=N) < epsilon # (N,) boolean array where True means take random action, False means take greedy action
         actions = np.where(explore, random_actions, greedy_actions) # (N,) array: if explore[i] is True, take random_actions[i], else take greedy_actions[i]
         next_states, rewards, is_terminals = mc.step(actions) # take a step in the environment with the chosen actions
+        steps += 1
+        # If any environment is terminal or if we've reached the time limit, reset those environments
+        if steps >= timelimit:
+            next_states = mc.reset() # full reset of all environments
+            steps = 0 # reset step count after a full reset
+        elif np.any(is_terminals):
+             # Masked reset only for environments that finished
+            # (Unfinished environments automatically stay at next_states)
+            next_states = mc.reset(mask=is_terminals)
         yield (
-            s,
+            states,
             actions,
             rewards,
             is_terminals,
             next_states,
         )
-        steps += 1
-        # If any environment is terminal or if we've reached the time limit, reset those environments
-        if steps >= timelimit:
-            s = mc.reset() # full reset of all environments
-            steps = 0 # reset step count after a full reset
-        elif np.any(is_terminals):
-             # Masked reset only for environments that finished
-            # (Unfinished environments automatically stay at next_states)
-            s = mc.reset(mask=is_terminals)
+        states = next_states # update state for the next iteration
         
 
 
