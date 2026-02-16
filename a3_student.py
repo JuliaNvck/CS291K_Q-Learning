@@ -219,5 +219,16 @@ def rollout_greedy(mc, timelimit, featuremap, weights, render=False):
             success (bool): True if the agent reached the goal (terminal state).
             steps (int): Number of steps to reach goal if successful, -1 if failed.
     """
-    # TODO: Implement.
+    s = mc.reset()
+    steps = 0
+    while steps < timelimit:
+        current_Qs = featuremap(s) @ weights # (N, A) array of Q-values for each action in the current states
+        greedy_actions = np.argmax(current_Qs, axis=1) # (N,) array of greedy actions for each environment
+        next_states, rewards, is_terminals = mc.step(greedy_actions) # take a step in the environment with the greedy actions
+        steps += 1
+        if render:
+            mc.render()
+        if np.any(is_terminals): # if any environment has reached the goal
+            return True, steps
+        s = next_states # update state for the next iteration
     return False, -1
