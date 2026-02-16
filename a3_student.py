@@ -146,6 +146,15 @@ def epsilon_greedy_generate_samples(mc, timelimit, epsilon, featuremap, weights,
     compute_batch_update_Q that occur between each `yield` statement. Do not
     copy `weights`; always read from the provided array.
 
+    For the parameter ϵ ∈ (0, 1), it chooses actions according to
+        (
+        a ~ Uniform(A) : with probability ϵ
+        argmax (a∈A) Qθ(s, a) : otherwise
+
+    It uses its current knowledge (the weights) to act optimally most of the time, 
+    but occasionally takes a random action to discover new strategies.
+    Because the agent is playing sequentially, this generator needs to remember the state between yield calls.
+
     Args:
         mc (MountainCar): MountainCar environment object.
         timelimit (int): Maximum number of steps per episode before full reset.
@@ -162,16 +171,34 @@ def epsilon_greedy_generate_samples(mc, timelimit, epsilon, featuremap, weights,
             is_terminal (array(N) of bool): Batch of is-terminal flags.
             s_next (array(N, S)): Batch of next states.
     """
-    # TODO: Implement.
+    mc.reseed(seed)
     N = mc.n_envs
+    s = mc.reset() # initial state for each environment
+    steps = 0 # to keep track of how many actions the agent has taken since the last full reset
     while True:
+        current_Qs = featuremap(s) @ weights # (N, A) array of Q-values for each action in the current states
+        greedy_actions = np.argmax(current_Qs, axis=1) # (N,) array of greedy actions for each environment
+        random_actions = mc.rng.integers(0, mc.N_ACTIONS, size=N) # (N,) array of random actions for each environment
+        explore = mc.rng.random(size=N) < epsilon # (N,) boolean array where True means take random action, False means take greedy action
+        actions = np.where(explore, random_actions, greedy_actions) # (N,) array: if explore[i] is True, take random_actions[i], else take greedy_actions[i]
+        next_states, rewards, is_terminals = mc.step(actions) # take a step in the environment with the chosen actions
         yield (
-            np.zeros((N, 2)),
-            np.zeros(N, dtype=int),
-            np.zeros(N),
-            np.zeros(N, dtype=bool),
-            np.zeros((N, 2)),
+            s,
+            actions,
+            rewards,
+            is_terminals,
+            next_states,
         )
+        steps += 1
+        # If any environment is terminal or if we've reached the time limit, reset those environments
+        if steps >= timelimit:
+            s = mc.reset() # full reset of all environments
+            steps = 0 # reset step count after a full reset
+        elif np.any(is_terminals):
+             # Masked reset only for environments that finished
+            # (Unfinished environments automatically stay at next_states)
+            s = mc.reset(mask=is_terminals)
+        
 
 
 def rollout_greedy(mc, timelimit, featuremap, weights, render=False):
