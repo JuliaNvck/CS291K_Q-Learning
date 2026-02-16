@@ -75,10 +75,28 @@ def compute_batch_update_Q(
         weight_decay (float): L2 regularization coefficient.
         learning_rate (float): Step size for gradient update.
 
+        $$J(theta) = 1/|D| * sum 1/2 (TD_Target} - Q_{theta}(s,a))^2
+
     Returns:
         None. The function modifies `weights` in-place.
     """
-    pass  # TODO: Implement, update `weights` in place.
+    phi_s = featuremap(states) # (N, d)
+    current_Qs = phi_s @ weights
+    current_Qs = current_Qs[np.arange(len(actions)), actions]
+    next_Qs = featuremap(next_states) @ target_weights
+    td_targets = compute_td_target(rewards, gamma, is_terminals, next_Qs)
+    features = phi_s
+    errors = td_targets - current_Qs
+    one_hot_actions = np.zeros((len(actions), weights.shape[1]))  # (N, A)
+    one_hot_actions[np.arange(len(actions)), actions] = 1 # make one-hot encoding of actions
+    routed_errors = one_hot_actions * errors[:, np.newaxis] # (N, A) array where only the column corresponding to the action taken has the error, others are zero
+    gradient = -(features.T @ routed_errors) / len(actions) # (d, A) gradient of the loss with respect to weights
+    # update weights with gradient descent step and weight decay    
+    weights -= learning_rate * (gradient)
+    # apply weight decay
+    weights -= learning_rate * weight_decay * weights
+    return None
+
 
 
 def genmodel_generate_samples(mc, seed):
